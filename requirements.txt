@@ -1,0 +1,4 @@
+ipdb
+opencv-python
+pip-chill
+scikit-image
