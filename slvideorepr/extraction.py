@@ -3,19 +3,109 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
-from skimage.metrics import structural_similarity as ssim
+from measures import *
 
-def mse(first_img, second_img):
-    first_img_float = first_img.astype("float32")
-    second_img_float = second_img.astype("float32")
-    total_pixels = first_img.shape[0] * second_img.shape[1]
+
+def process_individual_video_window(input_video, 
+                                    output_dir,
+                                    window_size,
+                                    measure):
+    '''Extract frames  with minimum change in a k-frame window'''
     
-    diff_img = (first_img_float - second_img_float) ** 2
-    score = diff_img.sum() / total_pixels
-    diff_img = np.sqrt(diff_img).astype("uint8")
+    if window_size % 2 == 0:
+        raise ValueError("window_size has to be an odd number, not %d" % window_size)
+
+    # Create output directory structure
+    try:
+        os.makedirs(output_dir)
+    except:
+        pass
+
+    capture = cv2.VideoCapture(input_video)
+
+    if capture.isOpened() == False:
+        raise ValueError("Something is wrong with video %s" % input_video)
+    else:
+        # Open, get width and height
+        width  = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    offset = np.floor(window_size/2)
+    last_img_gray = None
+    scores = []
+    while capture.isOpened():
+        ret, frame_img = capture.read()
+        if ret == True:
+            # Keep original
+            current_img = frame_img.copy()
+            
+            # Calculate gray image
+            gray_img = cv2.cvtColor(cv2.medianBlur(current_img, 5), 
+                    cv2.COLOR_BGR2GRAY)
+            
+            # See if it's the first image
+            try:
+                last_img_gray.shape
+            except:
+                last_img_gray = gray_img
+
+            # Calculate similarity
+            if measure == "ssim" :
+                current_m_score, diff_img = ssim(last_img_gray, 
+                        gray_img, 
+                        gaussian_weights=True, full=True)
+                current_m_score = 1 - current_m_score # DSSIM_modif
+            if measure == "gradient" :
+                current_m_score = single_image_gradient_score(gray_img, window_size)
+                current_m_score = 1 - current_m_score # Inverse acutance
+            if measure == "patches" :
+                current_m_score = nonlinear_comparison(last_img_gray,
+                                     gray_img, 100)
+            else:
+                current_m_score, diff_img = mse(last_img_gray, gray_img)
+            scores.append(current_m_score)
+            last_img_gray = gray_img
+        else:
+            break
+   
+    scores = scores[:-1]
+    capture.release()
+    #kernel = np.ones(window_size) * (1 / window_size)
+    #convolution_result = np.convolve(scores, kernel, "valid")
+
+    #results = [(i+offset, value) for i, value in enumerate(scores)]
+    results = [(i+1, value) for i, value in enumerate(scores)]
+    results = []
+    #for i, value in enumerate(scores):
+    #    if len(results) == 0:
+    #        results.append((i+1, value))
+    #    else:
+    #        if value < 0.1:
+    #            results.append((i+1, results[-1][1]))
+    #        else:
+    #            results.append((i+1, value))
+    i = 0
+    for value in scores:
+        if len(results) == 0:
+            results.append((i+1, value))
+            i += 1
+        else:
+            if value >= 1:
+                results.append((i+1, value))
+                i += 1
+    results = np.array(results)
+
+    plt.plot(results[:, 0],
+         results[:, 1])
     
-    return score, diff_img
-    
+    plt.savefig(output_dir + "/{0}_plot.png".format(measure), dpi=300)
+    plt.close()
+    with open(output_dir + "/{0}_values.txt".format(measure), "w") as fp:
+        #fp.writelines([str(n) + "\n" for n in convolution_result])
+        fp.writelines([str(n) + "\n" for n in scores])
+
+    print("Done video %s" % input_video)
+
 def process_individual_video(input_video, 
                              output_dir,
                              measure="ssim"):
@@ -117,4 +207,4 @@ def process_corpora(input_dir, output_dir, measure="ssim"):
                 new_dir = new_dir.replace(input_dir, str(output_dir))
                 
                 # Extract images
-                process_individual_video(input_video, new_dir, measure)
+                process_individual_video_window(input_video, new_dir, 5, measure)

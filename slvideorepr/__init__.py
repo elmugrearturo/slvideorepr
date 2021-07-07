@@ -9,6 +9,7 @@ def main(corpus_dir, measure):
     results_dir = pathlib.Path(__file__).parent.parent.absolute() / "results"
     results_dir /= measure
 
+    print("Results dir: %s" % str(results_dir))
     # Start video processing
     process_corpora(corpus_dir, results_dir, measure)
 
@@ -21,8 +22,10 @@ if __name__ == "__main__":
     
     try:
         measure = sys.argv[2]
-        if measure != "mse":
-            measure = "mse"
+        if measure != "mse" and \
+                measure != "gradient" and\
+                measure != "patches":
+            raise KeyError("Selecting SSIM")
     except:
         measure = "ssim"
 
