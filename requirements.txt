@@ -1,4 +1,6 @@
 ipdb
 opencv-python
 pip-chill
+pytube3
 scikit-image
+unidecode

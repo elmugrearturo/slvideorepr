@@ -10,6 +10,10 @@ from collections import OrderedDict
 template = "https://www.youtube.com/watch?v="
 
 def main(json_path, bin_folder="../bin/"):
+    try:
+        os.makedirs(bin_folder)
+    except:
+        pass
     video_list = []
     with open(json_path, "r") as fp:
         for line in fp:
