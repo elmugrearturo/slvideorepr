@@ -1,3 +1,6 @@
+# Converts youtube-dl json to a list of links to be downloaded
+# The list is pickled for the next script
+
 import pickle
 import sys
 import os
