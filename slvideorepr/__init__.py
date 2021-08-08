@@ -2,7 +2,7 @@ import sys
 import os
 import pathlib
 
-from extraction import process_corpora
+from svd_extraction import process_corpora
 
 def main(corpus_dir, measure):
     # Decide output folder
