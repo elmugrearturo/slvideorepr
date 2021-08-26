@@ -6,6 +6,37 @@ from collections import Counter
 import numpy as np
 import random
 
+import matplotlib.pyplot as plt
+
+def plot_1d_series(x_list, filename):
+    series = [(i+1, value) for i, value in enumerate(x_list)]
+    series = np.array(series)
+
+    plt.plot(series[:, 0],
+             series[:, 1])
+    plt.savefig(filename, dpi=300)
+    plt.close()
+
+# Method to calculate optimal resize
+def get_resize_scale(gray_img, max_face_width=100):
+    face_cascade = cv2.CascadeClassifier('/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml')
+    faces = face_cascade.detectMultiScale(gray_img, 1.1, 4)
+    # Should only have one face
+    _, _, w, h = faces[0]
+
+    #print(w, h)
+    #for (x, y, w, h) in faces:
+    #    cv2.rectangle(gray_img, (x, y), (x+w, y+h), (255, 0, 0), 2)
+    #mostrar_imagen(gray_img, "esto")
+    if w > max_face_width:
+        # Calculate correction
+        correction = max_face_width / w
+        return correction
+    else:
+        return 1.
+
+    
+
 # Método auxiliar para mostrar una imagen
 def mostrar_imagen(arreglo_bidimensional, titulo_de_ventana=None):
     if not titulo_de_ventana:

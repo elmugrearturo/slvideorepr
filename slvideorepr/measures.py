@@ -70,6 +70,44 @@ def mse_window(image_array):
     final_score = np.mean(all_scores)
     return final_score
 
+def image_crop_alt(img, k_h, k_w, show=False):
+    if show:
+        show_image("Original", img)
+   
+    y_residual = img.shape[0] % k_h
+    x_residual = img.shape[1] % k_w
+
+    patches = []
+    coords = []
+    
+    y = 0
+    while (y+k_h) < img.shape[0]:
+        x = 0
+        while (x+k_w) < img.shape[1]:
+            patches.append(img[y:y+k_h, x:x+k_w])
+            coords.append((y, y+k_h, x, x+k_w))
+            x = x + k_w
+        if x_residual != 0:
+            patches.append(img[y:y+k_h, x:x+x_residual])
+            coords.append((y, y+k_h, x, x+x_residual))
+        y = y + k_h
+    
+    if y_residual != 0:
+        x = 0
+        while (x+k_w) < img.shape[1]:
+            patches.append(img[y:y+y_residual, x:x+k_w])
+            coords.append((y, y+y_residual, x, x+k_w))
+            x = x + k_w
+        if x_residual != 0:
+            patches.append(img[y:y+y_residual, x:x+x_residual])
+            coords.append((y, y+y_residual, x, x+x_residual))
+
+    if show:
+        for i, p in enumerate(patches):
+            show_image("%s" % str(coords[i]), p)
+
+    return patches, coords
+
 def image_crop(img, k, show=False):
     if show:
         show_image("Original", img)
@@ -145,3 +183,72 @@ def nonlinear_comparison(f_img, s_img, k):
     if len(scores) == 0:
         import ipdb;ipdb.set_trace()
     return np.max(scores)
+
+# Gray-level histogram
+def gray_level_histogram(gray_img):
+    hist = []
+    for i in range(256):
+        hist.append(gray_img[gray_img == i].size)
+    return np.array(hist)
+
+# Gray-level entropy
+def gray_level_entropy(gray_img):
+    hist = gray_level_histogram(gray_img)
+    norm_hist = hist/hist.sum()
+    entropy = 0.
+    for k in range(256):
+        if norm_hist[k] != 0:
+            entropy += norm_hist[k] * np.log2(norm_hist[k])
+    entropy *= -1
+    return entropy
+
+# Position entropy
+def position_histogram(gray_img):
+    # The probability of each position is given by its intensity level.
+    norm_gray_img = gray_img / gray_img.sum()
+    entropy = 0.
+    for i in range(norm_gray_img.shape[0]):
+        for j in range(norm_gray_img.shape[1]):
+            if norm_gray_img[i, j] != 0:
+                entropy += norm_svd_img[i, j] * np.log2(norm_svd_img[i, j])
+    entropy *= -1
+    return entropy
+
+# KL-divergence (gray)
+def gray_level_kldiv(img_1, img_2):
+    hist_1 = gray_level_histogram(img_1)
+    hist_2 = gray_level_histogram(img_2)
+    norm_hist_1 = hist_1/hist_1.sum()
+    norm_hist_2 = hist_2/hist_2.sum()
+    kl_divergence = 0.
+    for k in range(256):
+        if norm_hist_1[k] != 0 and norm_hist_2[k] != 0:
+            p_div_q = norm_hist_1[k] / norm_hist_2[k]
+            kl_divergence += norm_hist_1[k] * np.log2(p_div_q)
+    return kl_divergence
+
+# KL-divergence (position)
+def position_kldiv(img_1, img_2):
+    # The probability of each position is given by its intensity level.
+    assert img_1.shape == img_2.shape
+    norm_img_1 = img_1 / img_1.sum()
+    norm_img_2 = img_2 / img_2.sum()
+    kl_divergence = 0.
+    for i in range(img_1.shape[0]):
+        for j in range(img_1.shape[1]):
+            if norm_img_1[i, j] != 0 and norm_img_2[i, j] != 0:
+                p_div_q = norm_img_1[k] / norm_img_2[k]
+                kl_divergence += norm_img_1[i, j] * np.log2(p_div_q)
+    return kl_divergence
+
+# Cross-entropy (gray)
+def gray_level_crossentropy(img_1, img_2):
+    entropy = gray_level_entropy(img_1)
+    kl_divergence = gray_level_kldiv(img_1, img_2)
+    return entropy + kl_divergence
+
+# Cross-entropy (position)
+def gray_level_crossentropy(img_1, img_2):
+    entropy = position_entropy(img_1)
+    kl_divergence = position_kldiv(img_1, img_2)
+    return entropy + kl_divergence
