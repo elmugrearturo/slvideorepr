@@ -109,6 +109,8 @@ def image_crop_alt(img, k_h, k_w, show=False):
     return patches, coords
 
 def image_crop(img, k, show=False):
+    # Crops image in patches
+    # k cuts per side
     if show:
         show_image("Original", img)
    
@@ -184,6 +186,57 @@ def nonlinear_comparison(f_img, s_img, k):
         import ipdb;ipdb.set_trace()
     return np.max(scores)
 
+# STARTS ENTROPY-BASED
+def cut_in_patches(img, k_patches, 
+        show=False, has_residual_patches=False):
+    # Crops image in patches
+    # k cuts per side
+    if show:
+        show_image("Original", img)
+   
+    k = int(np.sqrt(k_patches))
+    y_offset = int(img.shape[0] / k)
+    x_offset = int(img.shape[1] / k)
+    
+    # Deal with residuals
+    if has_residual_patches:
+        y_residual = img.shape[0] % k
+        x_residual = img.shape[1] % k
+    else:    
+        y_residual = 0
+        x_residual = 0
+
+    patches = []
+    coords = []
+    
+    y = 0
+    while (y+y_offset) < img.shape[0]:
+        x = 0
+        while (x+x_offset) < img.shape[1]:
+            patches.append(img[y:y+y_offset, x:x+x_offset])
+            coords.append((y, y+y_offset, x, x+x_offset))
+            x = x+x_offset
+        if x_residual != 0:
+            patches.append(img[y:y+y_offset, x:x+x_residual])
+            coords.append((y, y+y_offset, x, x+x_residual))
+        y = y+y_offset
+    
+    if y_residual != 0:
+        x = 0
+        while (x+x_offset) < img.shape[1]:
+            patches.append(img[y:y+y_residual, x:x+x_offset])
+            coords.append((y, y+y_residual, x, x+x_offset))
+            x = x+x_offset
+        if x_residual != 0:
+            patches.append(img[y:y+y_residual, x:x+x_residual])
+            coords.append((y, y+y_residual, x, x+x_residual))
+
+    if show:
+        for i, p in enumerate(patches):
+            show_image("%s" % str(coords[i]), p)
+
+    return np.array(patches), np.array(coords)
+
 # Gray-level histogram
 def gray_level_histogram(gray_img):
     hist = []
@@ -203,14 +256,14 @@ def gray_level_entropy(gray_img):
     return entropy
 
 # Position entropy
-def position_histogram(gray_img):
+def position_entropy(gray_img):
     # The probability of each position is given by its intensity level.
     norm_gray_img = gray_img / gray_img.sum()
     entropy = 0.
     for i in range(norm_gray_img.shape[0]):
         for j in range(norm_gray_img.shape[1]):
             if norm_gray_img[i, j] != 0:
-                entropy += norm_svd_img[i, j] * np.log2(norm_svd_img[i, j])
+                entropy += norm_gray_img[i, j] * np.log2(norm_gray_img[i, j])
     entropy *= -1
     return entropy
 
@@ -230,14 +283,20 @@ def gray_level_kldiv(img_1, img_2):
 # KL-divergence (position)
 def position_kldiv(img_1, img_2):
     # The probability of each position is given by its intensity level.
-    assert img_1.shape == img_2.shape
+    if img_1.shape[0] == img_2.shape[0]:
+        if img_1.shape[1] == img_2.shape[1]:
+            pass
+        else:
+            raise ValueError("Incompatible dimensions")
+    else:    
+        raise ValueError("Incompatible dimensions")
     norm_img_1 = img_1 / img_1.sum()
     norm_img_2 = img_2 / img_2.sum()
     kl_divergence = 0.
     for i in range(img_1.shape[0]):
         for j in range(img_1.shape[1]):
             if norm_img_1[i, j] != 0 and norm_img_2[i, j] != 0:
-                p_div_q = norm_img_1[k] / norm_img_2[k]
+                p_div_q = norm_img_1[i, j] / norm_img_2[i, j]
                 kl_divergence += norm_img_1[i, j] * np.log2(p_div_q)
     return kl_divergence
 
@@ -248,7 +307,16 @@ def gray_level_crossentropy(img_1, img_2):
     return entropy + kl_divergence
 
 # Cross-entropy (position)
-def gray_level_crossentropy(img_1, img_2):
+def position_crossentropy(img_1, img_2):
     entropy = position_entropy(img_1)
     kl_divergence = position_kldiv(img_1, img_2)
     return entropy + kl_divergence
+
+# Compare two sets of patches
+def per_patch_comparison(patch_group_1, patch_group_2, functor):
+    assert patch_group_1.shape[0] == patch_group_2.shape[0]
+    results = []
+    for i in range(patch_group_1.shape[0]):
+        result = functor(patch_group_1[i], patch_group_2[i])
+        results.append(result)
+    return np.array(results)
